@@ -1,0 +1,61 @@
+# System
+import os
+
+# Application
+from openai import OpenAI
+from llama_index import SimpleDirectoryReader, GPTVectorStoreIndex, LLMPredictor, ServiceContext
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.vector_stores import FAISSVectorStore
+from llama_index.storage.storage_context import StorageContext
+from llama_index.query_engine import RetrieverQueryEngine
+from llama_index import GPTVectorStoreIndex, StorageContext, load_index_from_storage
+
+# Set OpenAI API key
+os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+
+class LlamaindexRAG:
+  def __init__(self, model_name: str):
+    self.model_name _ model_name
+
+  def build_index(self, path_to_documents: str):
+    # Load documents from a directory
+    documents = SimpleDirectoryReader(path_to_documents).load_data()
+    
+    # Set up embedding and LLM predictor
+    embedding_model = OpenAIEmbedding()
+    llm_predictor = LLMPredictor(llm=OpenAI(model="text-davinci-003"))
+  
+    service_context = ServiceContext.from_defaults(embed_model=embedding_model, llm_predictor=llm_predictor)
+    
+    # Create a FAISS vector store and build the index
+    vector_store = FAISSVectorStore(embedding_model=embedding_model)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    
+    index = GPTVectorStoreIndex.from_documents(documents, service_context=service_context, storage_context=storage_context)
+    
+    # Save the index for future use
+    index.storage_context.persist(persist_dir='./faiss_index')
+
+    self.index = index
+
+  def query(self, query: str):
+    # Load the saved index
+    storage_context = StorageContext.from_defaults(persist_dir='./faiss_index')
+    index = load_index_from_storage(storage_context)
+    
+    # Perform a query
+    response = index.query(query, mode="embedding")
+    print("Response:", response)
+
+    return response
+    
+  def query_rag(self, query: str):
+    # Define a query engine for RAG
+    retriever = self.index.as_retriever(similarity_top_k=5)  # Retrieve top 5 relevant docs
+    query_engine = RetrieverQueryEngine(retriever=retriever, service_context=service_context)
+    
+    # Query the engine
+    response = query_engine.query(query)
+    print("Generated Answer:", response.response)
+  
+    return response
