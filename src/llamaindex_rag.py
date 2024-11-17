@@ -14,7 +14,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from sentence_transformers import SentenceTransformer
 
 # Set OpenAI API key
-os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+# os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
 
 class LlamaindexRAG:
   def __init__(self, model_name: str, use_faiss: bool = True):
@@ -25,9 +25,13 @@ class LlamaindexRAG:
     documents = SimpleDirectoryReader(path_to_documents).load_data()  # Load documents from a folder
     
     # Set up embedding and LLM predictor
-    #embedding_model = OpenAIEmbedding()
+    # embedding_model = OpenAIEmbedding()
     embedding_model = SentenceTransformer(self.model_name)
-    llm_predictor = LLMPredictor(llm=OpenAI(model=self.model_name))
+    # self.model = OpenAI(model=self.model_name)
+    self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+    self.model = AutoModelForCausalLM.from_pretrained(self.model_name,
+                                                 device_map="auto")  # Adjust for GPU usage if available
+    llm_predictor = LLMPredictor(llm=self.model)
 
     if self.use_faiss:
       # Create a FAISS vector store and build the index
