@@ -9,6 +9,7 @@ from llama_index.vector_stores import FAISSVectorStore
 from llama_index.storage.storage_context import StorageContext
 from llama_index.query_engine import RetrieverQueryEngine
 from llama_index import GPTVectorStoreIndex, StorageContext, load_index_from_storage
+from llama_index import SQLDatabase, GPTSQLStructStoreIndex
 
 # Set OpenAI API key
 os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
@@ -25,13 +26,15 @@ class LlamaindexRAG:
     embedding_model = OpenAIEmbedding()
     llm_predictor = LLMPredictor(llm=OpenAI(model="text-davinci-003"))
   
-    service_context = ServiceContext.from_defaults(embed_model=embedding_model, llm_predictor=llm_predictor)
+    self.service_context = ServiceContext.from_defaults(embed_model=embedding_model, llm_predictor=llm_predictor)
     
     # Create a FAISS vector store and build the index
     vector_store = FAISSVectorStore(embedding_model=embedding_model)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    self.storage_context = StorageContext.from_defaults(vector_store=vector_store)
     
-    index = GPTVectorStoreIndex.from_documents(documents, service_context=service_context, storage_context=storage_context)
+    index = GPTVectorStoreIndex.from_documents(documents,
+                                               service_context=self.service_context,
+                                               storage_context=self.storage_context)
     
     # Save the index for future use
     index.storage_context.persist(persist_dir='./faiss_index')
@@ -52,10 +55,26 @@ class LlamaindexRAG:
   def query_rag(self, query: str):
     # Define a query engine for RAG
     retriever = self.index.as_retriever(similarity_top_k=5)  # Retrieve top 5 relevant docs
-    query_engine = RetrieverQueryEngine(retriever=retriever, service_context=service_context)
+    query_engine = RetrieverQueryEngine(retriever=retriever,
+                                        service_context=self.service_context)
     
     # Query the engine
     response = query_engine.query(query)
     print("Generated Answer:", response.response)
   
+    return response
+
+  def query_from_db(self, db_path: str, query: str):
+    # Connect to a SQL database
+    sql_database = SQLDatabase(f"sqlite:///{db_path}")
+    
+    # Build an index for structured data
+    sql_index = GPTSQLStructStoreIndex.from_documents([],
+                                                      sql_database=sql_database,
+                                                      service_context=self.service_context)
+    
+    # Query the SQL index
+    response = sql_index.query(query)
+    print("SQL Response:", response)
+
     return response
